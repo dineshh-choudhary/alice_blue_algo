@@ -1,0 +1,78 @@
+import json
+from datetime import datetime
+from time import time, ctime
+import pandas as pd
+import requests
+# from login import *
+
+from data.get_cookies import GetCookies
+from indicators.indicators import SuperTrend
+from order.AliceBlueClient import AliceBlueClient
+
+
+class GetHistoricalData:
+
+    def __init__(self):
+        pass
+
+    def get_live_data_by_instrument_token(self, token, candle_type = 1):
+        start_time = 1580022709
+        current_time = int(time())
+        candle_type = candle_type
+        data_type = "live"
+        return self.get_data_by_instrument_token(token, start_time, current_time, candle_type, data_type)
+
+    def get_historical_data_by_instrument_token(self, token, start_time, end_time, candle_type):
+        data_type = "historical"
+        return self.get_data_by_instrument_token(token, start_time, end_time, candle_type, data_type)
+
+    def get_data_by_instrument_token(self, token, start_time, end_time, candle_type, data_type):
+        exchange = "NFO"
+        access_token_hist = open('access_token.txt', 'r').read().rstrip()
+        headers = {
+            'authority': 'ant.aliceblueonline.com',
+            'accept': '*/*',
+            'x-authorization-token': access_token_hist,
+            'x-requested-with': 'XMLHttpRequest',
+        }
+
+        params = f'exchange={exchange}&token={token}&candletype=1&starttime={start_time}&endtime={end_time}&type={data_type}&data_duration={candle_type}'
+
+        response = requests.get('https://ant.aliceblueonline.com/api/v1/charts', headers=headers, params=params)
+        jso = response.text
+        conv = json.loads(jso)
+        if (conv['status'] == 'error'):
+            GetCookies.refresh_cookie()
+            response = requests.get('https://ant.aliceblueonline.com/api/v1/charts', headers=headers, params=params)
+            jso = response.text
+            conv = json.loads(jso)
+
+        datas = conv['data']
+
+        feeddata = []
+        for data in datas:
+            sec = data[0]
+            t = ctime(sec)
+            t2 = datetime.fromtimestamp(sec)
+            opn = data[1] / 100
+            hig = data[2] / 100
+            lo = data[3] / 100
+            clo = data[4] / 100
+            vol = data[5]
+            feed = {"Date1": t,"Date":t2 , "open": opn, "high": hig, "low": lo, "close": clo, "volume": vol}
+            feeddata.append(feed)
+
+        datafm = pd.DataFrame(feeddata)
+        return datafm
+
+#
+# alice = AliceBlueClient().getAliceBlueObject()
+# exchange = "NFO"
+# symbol = "BANKNIFTY 04 FEB21 34100.0 PE"
+# # Instrument(exchange='NFO', token=57982, symbol='BANKNIFTY 04 FEB21 34100.0 PE', name='',
+# #            expiry=datetime.date(2021, 2, 4), lot_size='25'),
+#
+# tokens = alice.get_instrument_by_symbol(exchange, symbol)
+
+a = GetHistoricalData(None).get_live_data_by_instrument_token(46488,candle_type=2)
+print(a)
