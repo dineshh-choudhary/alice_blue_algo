@@ -1,0 +1,42 @@
+
+import requests
+import json
+class GetCookies:
+
+    @staticmethod
+    def refresh_cookie():
+        login_url = "https://ant.aliceblueonline.com/api/v2/login"
+        twofa_url = "https://ant.aliceblueonline.com/api/v2/checktwofa"
+        s = requests.Session()
+
+        # secret = json.loads(open('secret.json', 'r').read().rstrip())
+
+        # NOTE contents of secret.json must be like below
+        secret = {
+            "login_id": "*****",
+            "password": "*****",
+            "twofa": "a"
+        }
+
+        login_json = {"device": "web"}
+        login_json['login_id'] = secret['login_id']
+        login_json['password'] = secret['password']
+
+        r = s.post(login_url, json=login_json)
+
+        twofa_json = {"device": "web", "count": 2}
+        twofa_json['login_id'] = secret['login_id']
+        twofa_json['answers'] = [secret['twofa'], secret['twofa']]
+        twofa_json['question_ids'] = r.json()['data']['question_ids']
+
+        r = s.post(twofa_url, json=twofa_json)
+
+        print(r.json()['data']['auth_token'])
+
+        with open('access_token.txt', 'w') as wr:
+            wr.write(r.json()['data']['auth_token'])
+
+        print(open('access_token.txt', 'r').read().rstrip())
+
+
+GetCookies.refresh_cookie()
