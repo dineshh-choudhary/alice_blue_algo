@@ -1,0 +1,27 @@
+class AliceHelper:
+
+    # open complete rejected
+    def check_order_execution(self, order_info):
+        all_order_history = order_info
+        order_history = all_order_history["data"][0]
+        res = {
+            "status": order_history["order_status"],
+            "order_history": order_history,
+            "all_order_history" : all_order_history,
+            "is_complete": False,
+            "is_rejected": False,
+            "is_open": False
+        }
+        # if (all_order_history["status"] == "success"):
+
+        if order_history["order_status"] in ["open", "open pending", "validation pending",
+                                                   "put order req received", "trigger pending"]:
+            res["is_open"] = True
+
+        elif (order_history["order_status"] in ["complete"]):
+            res["is_complete"] = True
+
+        elif (order_history["order_status"] in ["rejected"]):
+            res["is_rejected"] = True
+
+        return res
