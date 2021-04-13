@@ -1,0 +1,116 @@
+import json
+
+import pandas as pd
+from nsetools import Nse
+
+from broker_creds import broker_creds
+from order.AliceBlueClient import AliceBlueClient
+
+
+class AliceHelper:
+    def __init__(self, alice):
+        self.alice = alice
+
+    def get_weekly_expiry(self):
+        instruments = self.alice.search_instruments('NFO', 'BANKNIFTY')
+        instruments = pd.DataFrame(instruments)
+        get_monthly_expiry = instruments['expiry'].tail(3)
+        get_monthly_expiry = min(get_monthly_expiry)
+        weekly_expiry = instruments.expiry.unique()
+        get_weekly_expiry = min(weekly_expiry)
+        return get_weekly_expiry
+
+    def get_monthly_expiry(self):
+        instruments = self.alice.search_instruments('NFO', 'BANKNIFTY')
+        instruments = pd.DataFrame(instruments)
+        get_monthly_expiry = instruments['expiry'].tail(3)
+        get_monthly_expiry = min(get_monthly_expiry)
+        return get_monthly_expiry
+
+    def get_bnf_instrument(self, strike, is_CE):
+        expiry = self.get_weekly_expiry()
+        return self.alice.get_instrument_for_fno(symbol='BANKNIFTY', expiry_date=expiry, is_fut=False,
+                                                 strike=strike, is_CE=is_CE)
+
+    def get_nifty_instrument(self, strike, is_CE):
+        expiry = self.get_weekly_expiry()
+        return self.alice.get_instrument_for_fno(symbol='NIFTY', expiry_date=expiry, is_fut=False,
+                                                 strike=strike, is_CE=is_CE)
+
+    def get_token_by_symbol(self, symbol):
+        exchange = "NSE"
+        tokens = self.alice.get_instrument_by_symbol(exchange, symbol)
+        script = json.dumps(tokens)
+        script_det = json.loads(script)
+        script_token = script_det[1]
+        return script_token
+
+    def get_nearby_options_for_bnf(self):
+        expiry = self.get_weekly_expiry()
+        bnf_price = self.get_bnf_current_price()
+        get_weekly_expiry_ce = self.get_all_instrument_for_fno(symbol='BANKNIFTY', expiry_date=expiry, is_fut=False,
+                                                               is_CE=True)
+        get_weekly_expiry_pe = self.get_all_instrument_for_fno(symbol='BANKNIFTY', expiry_date=expiry, is_fut=False,
+                                                               is_CE=False)
+
+        res = {"CE": [], "PE": [], "ALL": []}
+        for option in get_weekly_expiry_ce:
+            sp = option.symbol.split(' ')
+            strike = int(float(sp[-2]))
+            bnf_price = int(bnf_price)
+            if strike in range(bnf_price - 300, bnf_price + 300, 1):
+                res["CE"].append(option)
+                res["ALL"].append(option)
+        for option in get_weekly_expiry_pe:
+            sp = option.symbol.split(' ')
+            strike = int(float(sp[-2]))
+            bnf_price = int(bnf_price)
+            if strike in range(bnf_price - 300, bnf_price + 300, 1):
+                res["PE"].append(option)
+                res["ALL"].append(option)
+        return res
+
+    def get_bnf_current_price(self):
+        nse = Nse()
+        # {'name': 'NIFTY BANK', 'lastPrice': 32250.35, 'change': '-269.40', 'pChange': '-0.83', 'imgFileName': 'NIFTY_BANK_open.png'}
+        return nse.get_index_quote("nifty bank")['lastPrice']
+
+    def get_all_instrument_for_fno(self, symbol, expiry_date, is_fut=False, strike=None, is_CE=False, exchange='NFO'):
+        """ get instrument for FNO """
+        res = self.alice.search_instruments(exchange, symbol)
+        if (res == None):
+            return
+        matches = []
+        matching_scripts = []
+        for i in res:
+            sp = i.symbol.split(' ')
+            if (sp[0] == symbol):
+                if (i.expiry == expiry_date):
+                    matches.append(i)
+        for i in matches:
+            if (is_fut == True):
+                if ('FUT' in i.symbol):
+                    return i
+            else:
+                sp = i.symbol.split(' ')
+                if ((sp[-1] == 'CE') or (sp[-1] == 'PE')):  # Only option scrips
+                    # if(float(sp[-2]) == float(strike)):
+                    if (is_CE == True):
+                        if (sp[-1] == 'CE'):
+                            matching_scripts.append(i)
+                    else:
+                        if (sp[-1] == 'PE'):
+                            matching_scripts.append(i)
+        return matching_scripts
+
+
+if __name__ == "__main__":
+    alice = None
+    alice_clients = broker_creds.get("master_broker")
+    for client in alice_clients:
+        alice = AliceBlueClient(client["client_id"], client["password"], client["twofa"], client["api_secret"],
+                                client["app_id"]).getAliceBlueObject()
+
+    alice_helper = AliceHelper(alice)
+    print(alice_helper.get_weekly_expiry())
+    print(alice_helper.get_monthly_expiry())
